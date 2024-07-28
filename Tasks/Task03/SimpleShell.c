@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <fcntl.h>
+#include <errno.h>
+
 
 #define STDIN 0
 #define STDOUT 1
@@ -14,8 +17,11 @@ void exit_shell();
 void help();
 void mv(char *args[]);
 int file_exist(char * file_name);
+void cp_command(char *source, char *target, int append);
+void parse_and_execute(char *input[]);
 
-char* commands[] = {"pwd", "echo","exit","help","mv"};
+
+char* commands[] = {"pwd", "echo","exit","help","mv","cp"};
 int main(void)
 {
 	char command[PATH_MAX];
@@ -64,6 +70,11 @@ int main(void)
 
 		mv(args);
 	}
+	else if(strcmp(commands[5],args[0])==0)
+	{
+		parse_and_execute(args[0]);
+	}
+	
 	
 }
 	return 0;
@@ -163,4 +174,89 @@ void mv(char* args[])
 int file_exist(char * file_name)
 {
 	return access(file_name, F_OK)==0;
+}
+
+
+void cp_command(char *source, char *target, int append) {
+    int src_fd, dest_fd;
+    ssize_t nread;
+    char buffer[1024];
+
+    // Open source file
+    src_fd = open(source, O_RDONLY);
+    if (src_fd == -1) {
+        perror("Error opening source file");
+        return;
+    }
+
+    // Check if target file exists
+    if (!append && access(target, F_OK) != -1) {
+        fprintf(stderr, "Error: target file already exists\n");
+        close(src_fd);
+        return;
+    }
+
+    // Open target file (O_WRONLY|O_CREAT|O_APPEND for append, O_WRONLY|O_CREAT|O_EXCL otherwise)
+    int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_EXCL);
+    dest_fd = open(target, flags, 0644);
+    if (dest_fd == -1) {
+        perror("Error opening/creating target file");
+        close(src_fd);
+        return;
+    }
+
+    // Copy contents from source to target
+    while ((nread = read(src_fd, buffer, sizeof(buffer))) > 0) {
+        if (write(dest_fd, buffer, nread) != nread) {
+            perror("Error writing to target file");
+            close(src_fd);
+            close(dest_fd);
+            return;
+        }
+    }
+
+    if (nread == -1) {
+        perror("Error reading source file");
+    }
+
+    close(src_fd);
+    close(dest_fd);
+}
+
+void parse_and_execute(char *input[]) {
+    char *cmd = input[0];
+    if (cmd == NULL) {
+        return;
+    }
+
+    if (strcmp(cmd, "cp") == 0) {
+        int opt;
+        int append = 0;
+        char *source = NULL;
+        char *target = NULL;
+
+        // Use getopt to parse options
+        while ((opt = getopt(2, &cmd, "a")) != -1) {
+            switch (opt) {
+                case 'a':
+                    append = 1;
+                    break;
+                default:
+                    fprintf(stderr, "Usage: cp [-a] source target\n");
+                    return;
+            }
+        }
+
+        source = input[1];
+        target = input[2];
+
+        if (source == NULL || target == NULL) {
+            fprintf(stderr, "Usage: cp [-a] source target\n");
+            return;
+        }
+
+        cp_command(source, target, append);
+    } else {
+        printf("Command not found: %s\n", cmd);
+    }
 }
