@@ -6,7 +6,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include "SimpleShell.h"
-char* commands[] = {"mypwd", "myecho","myexit","myhelp","mymv","mycp","mycd","mytype","myenv"};
+char* commands[] = {"mypwd", "myecho","myexit","myhelp","mymv","mycp","mycd","mytype","myenv","free","uptime"};
+
 int min_valid_arguments[] = {1, 2, 1, 1, 3, 3};
 
 int main(int argc, char ** argv)
@@ -20,10 +21,19 @@ int main(int argc, char ** argv)
 	while(1){
 	write(STDOUT, shellMsg, strlen(shellMsg));
 
-	readSize = read(STDIN, command, 100);
+	readSize = read(STDIN, command, sizeof(command) - 1);
 	
+	if(readSize <= 0)
+	{
+		perror("read");
+		continue;
+	}
 	command[readSize] = '\0';
-
+	if(readSize > 0 && command[readSize - 1] == '\n')
+	{
+		command[readSize - 1] = '\0';
+	}
+	
 	/* get the first token */
 	args[arg_count] = strtok(command," ");
 	
@@ -32,7 +42,46 @@ int main(int argc, char ** argv)
 		arg_count++;
 		args[arg_count] = strtok(NULL, " ");
 	}
+
 	args[arg_count] = NULL;
+
+
+	int input_fd = STDIN_FILENO;
+	int output_fd = STDOUT_FILENO;
+	int error_fd = STDERR_FILENO;
+
+	for(int i = 0 ; args[i] != NULL; i++)
+	{
+		if(strcmp(args[i],"<") == 0)
+		{
+			input_fd = open(args[i+1], O_RDONLY);
+			if(input_fd < 0)
+			{
+				perror("open input files");
+				input_fd = STDIN_FILENO;
+			}
+			args[i] = NULL; //remove redirection part from args
+		} else if(strcmp(args[i], ">")== 0)
+		{
+			output_fd = open(args[i+1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if(output_fd < 0)
+			{
+				perror("open output file");
+				output_fd = STDOUT_FILENO;
+			}
+			args[i] = NULL;
+		}
+		else if (strcmp(args[i], "2>") == 0)
+		{
+			error_fd = open(args[i+1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if(error_fd < 0)
+			{
+				perror("open error file");
+				error_fd = STDERR_FILENO;
+			}
+			args[i] = NULL;
+		}
+	}
 
 	/* walk through other tokens */
 	if(strcmp(commands[0],args[0])==0)
@@ -106,9 +155,17 @@ int main(int argc, char ** argv)
 	{
 		print_env_var();
 	}
+	else if(strcmp(commands[9],args[0]) ==0)
+	{
+		print_memory_info();
+	}
+	else if(strcmp(commands[10],args[0])==0)
+	{
+		print_uptime_info();
+	}
 	else 
 	{
-		char* command = args[1];
+		/*char* command = args[1];
 		char **args_ = malloc((arg_count) * sizeof(char *));
 		if (args_ == NULL)
 		{
@@ -121,12 +178,14 @@ int main(int argc, char ** argv)
 		{
 			args_[i-1] = args[i];
 		}
-		args_[arg_count - 1] = NULL;
-
-		execute_command(command, args_);
-		free(args_);
+		args_[arg_count*/
+	       execute_command(args[0],args,input_fd,output_fd,error_fd);	
 	
 	}
+		input_fd = STDIN_FILENO;
+		output_fd = STDOUT_FILENO;
+		error_fd = STDERR_FILENO;
+		
 	}
 	return 0;
 }
@@ -158,7 +217,7 @@ void echo(char* args[])
 
 void exit_shell()
 {
-	printf("GoodBye\n");
+	printf("GoodBye%c\n",7);
 	exit(1);
 
 }
@@ -175,52 +234,6 @@ void help()
 
 }
 
-
-void mv(char* args[])
-{
-	/*int force = 0;
-
-        if(strcmp(args[1], "-f") == 0)
-        {
-	        force = 1;
-       		 args++;
-        }
-
-        if(args[1] == NULL || args[2] == NULL)
-        {
-                fprintf(stderr,"Usage : mv [-f] source_file target_file\n");
-        	return;
-	}
-        char *source = args[1];
-        char *target = args[2];
-        char *target_path = strdup(target);
-
-        if(access(target,F_OK) == 0 && access(target, X_OK) == 0)
-        {
-                target = strcat(target, "/");
-                target = strcat(target, basename(source));
-        }
-
-        if(access(target, F_OK) ==0 && !force)
-        {
-                fprintf(stderr, "Error : Target file exists\n");
-                free(target_path);
-                return;
-        }
-
-        if(rename(source, target) < 0)
-        {
-                perror("rename");
-        }
-
-        free(target_path);*/
-	int res = file_exist("Tst.c");
-	if(res)
-		printf("Exists");
-	else
-		printf("Doesnt exist\n");
-
-}
 
 int file_exist(char * file_name)
 {
@@ -407,7 +420,7 @@ void print_env_var()
 }
 
 
-void execute_command(const char *command, char *const args[]) {
+void execute_commands(const char *command, char *const args[]) {
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
@@ -431,4 +444,116 @@ void execute_command(const char *command, char *const args[]) {
             printf("Child terminated by signal %d\n", WTERMSIG(status));
         }
     }
+}
+
+void print_memory_info()
+{
+	FILE *file;
+	char buffer[BUFF_SIZE];
+	unsigned long total_ram , free_ram , total_swap, free_swap;
+
+	file = fopen("/proc/meminfo", "r");
+
+	if(file == NULL)
+	{
+		perror("fopen");
+		return;
+	}
+
+	while(fgets(buffer, sizeof(buffer), file))
+	{
+		if(strncmp(buffer, "MemTotal:", 9) == 0)
+			sscanf(buffer, "MemTotal: %lu kB", &total_ram);
+		else if(strncmp(buffer, "MemTotal:", 8) == 0)
+		{
+			sscanf(buffer, "MemFree: %lu kB", &free_ram);
+				
+		}
+		else if(strncmp(buffer, "SwapTotal:", 10) ==0)
+		{
+			sscanf(buffer, "SwapTotal: %lu", &total_swap);
+		}
+		else if(strncmp(buffer, "SwapFree:", 9) == 0)
+		{
+			sscanf(buffer, "SwapFree: %lu kB", &free_swap);
+		}
+	}
+
+	fclose(file);
+
+	printf("RAM Info:\n");
+	printf("Total RAM: %lu kB\n",total_ram);
+	printf("Free RAM: %lu kB\n", free_ram);
+	printf("Used RAM: %lu kB\n",total_ram - free_ram);
+	
+	printf("Swap Info:\n");
+        printf("Total Swap: %lu kB\n",total_swap);
+        printf("Free Swap: %lu kB\n", free_swap);
+        printf("Used Swap: %lu kB\n",total_swap - free_swap);
+
+}
+
+void print_uptime_info()
+{
+	FILE * file;
+	double uptime, idle_time;
+
+	file = fopen("/proc/uptime", "r");
+	if(file == NULL)
+	{
+		perror("fopen");
+		return;
+	}
+
+	if(fscanf(file, "%lf %lf", &uptime, &idle_time) != 2)
+	{
+		perror("fscanf");
+		fclose(file);
+		return;
+	}
+
+	fclose(file);
+
+	printf("System Uptime: %.2f seconds\n",uptime);
+	printf("Idle Time: %.2f second\n",idle_time);
+}
+
+void execute_command(const char* command, char* const args[], int input_fd, int output_fd, int error_fd)
+{
+	pid_t pid = fork();
+	if(pid < 0)
+	{
+		perror("Fork");
+		exit(EXIT_FAILURE);
+	}
+
+	if(pid == 0)
+	{
+		if(input_fd != STDIN_FILENO)
+		{
+			dup2(input_fd, STDIN_FILENO);
+			close(input_fd);
+		}
+
+		if(output_fd != STDOUT_FILENO)
+		{
+			dup2(output_fd, STDOUT_FILENO);
+			close(output_fd);
+		}
+
+		if(error_fd != STDERR_FILENO)
+		{
+			dup2(error_fd, STDERR_FILENO);
+			close(error_fd);
+		}	
+
+		execvp(command,args);
+		perror("execvp");
+		exit(EXIT_FAILURE);
+
+	}
+	else 
+	{
+		wait(NULL);
+	}
 }
