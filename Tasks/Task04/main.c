@@ -6,7 +6,9 @@
 #include <errno.h>
 #include <stdlib.h>
 #include "SimpleShell.h"
-char* commands[] = { "mypwd", "myecho","myexit","myhelp","mymv","mycp","mycd","mytype","myenv","free","uptime" };
+
+const char* commands[] = { "mypwd", "myecho","myexit","myhelp","mymv","mycp","mycd","mytype","myenv","free","uptime" };
+
 
 int min_valid_arguments[] = { 1, 2, 1, 1, 3, 3 };
 
@@ -16,7 +18,7 @@ int main(int argc, char** argv)
 	char* args[MAX_ARGS];
 	ssize_t readSize = 0;
 	int arg_count = 0;
-
+	int redirection_flag = 0;
 	const char* shellMsg = "O2mor Ya Ghaly >> ";
 	while (1) {
 		write(STDOUT, shellMsg, strlen(shellMsg));
@@ -36,56 +38,25 @@ int main(int argc, char** argv)
 
 		/* get the first token */
 		args[arg_count] = strtok(command, " ");
-
+		printf("t");
+		redirection_flag = 0;
 		while (args[arg_count] != NULL && arg_count < MAX_ARGS - 1)
 		{
+			if(strcmp(args[arg_count],">") == 0 || strcmp(args[arg_count],"<") ==0)
+				redirection_flag = 1;
 			arg_count++;
 			args[arg_count] = strtok(NULL, " ");
+			
 		}
 
 		args[arg_count] = NULL;
-
-
-		int input_fd = STDIN_FILENO;
-		int output_fd = STDOUT_FILENO;
-		int error_fd = STDERR_FILENO;
-
-		for (int i = 0; args[i] != NULL; i++)
-		{
-			if (strcmp(args[i], "<") == 0)
-			{
-				input_fd = open(args[i + 1], O_RDONLY);
-				if (input_fd < 0)
-				{
-					perror("open input files");
-					input_fd = STDIN_FILENO;
-				}
-				args[i] = NULL; //remove redirection part from args
-			}
-			else if (strcmp(args[i], ">") == 0)
-			{
-				output_fd = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-				if (output_fd < 0)
-				{
-					perror("open output file");
-					output_fd = STDOUT_FILENO;
-				}
-				args[i] = NULL;
-			}
-			else if (strcmp(args[i], "2>") == 0)
-			{
-				error_fd = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-				if (error_fd < 0)
-				{
-					perror("open error file");
-					error_fd = STDERR_FILENO;
-				}
-				args[i] = NULL;
-			}
-		}
-
+		printf("tt");
+		//int redirection_flag = isThereRedirection(command);
+		printf("redirect = %d\n",redirection_flag);
 		/* walk through other tokens */
-		if (strcmp(commands[0], args[0]) == 0)
+		if(redirection_flag == 0)
+		{
+			if (strcmp(commands[0], args[0]) == 0)
 		{
 			if (min_valid_arguments[0] >= arg_count + 1)
 			{
@@ -150,6 +121,7 @@ int main(int argc, char** argv)
 		}
 		else if (strcmp(commands[7], args[0]) == 0)
 		{
+			printf("Here 1");
 			type(args[1]);
 		}
 		else if (strcmp(commands[8], args[0]) == 0)
@@ -164,29 +136,56 @@ int main(int argc, char** argv)
 		{
 			print_uptime_info();
 		}
-		else
+		}
+		else if(redirection_flag == 1)
 		{
-			/*char* command = args[1];
-			char **args_ = malloc((arg_count) * sizeof(char *));
-			if (args_ == NULL)
+		int stdout_backup = dup(STDOUT_FILENO);
+		
+			printf("1\n");
+			int redirect_fd = open(args[2], O_CREAT | O_TRUNC | O_WRONLY);
+			if(redirect_fd < 0)
 			{
-				perror("malloc");
-				exit(EXIT_FAILURE);
+				perror("Error opening file for redirection");
+				continue;
 			}
-
-			args_[0] = command;
-			for(int i = 2; i < arg_count; i++)
+			printf("2\n");
+			if(dup2(redirect_fd, STDOUT_FILENO) < 0)
 			{
-				args_[i-1] = args[i];
+				perror("Error redirecting stdout");
+				close(redirect_fd);
+				continue;
 			}
-			args_[arg_count*/
-			execute_command(args[0], args, input_fd, output_fd, error_fd);
+			printf("3\n");
+			close(redirect_fd);
+			
+			if (strcmp(commands[0], args[0]) == 0)
+            		{
+            		    if (min_valid_arguments[0] >= arg_count + 1)
+            		    {
+                		    perror("Insufficient Arguments!");
+                		    dup2(stdout_backup, STDOUT_FILENO);
+                		    close(stdout_backup);
+                		    continue;
+               	    	     }
+                	    pwd();
+            		}
+            		else if (strcmp(commands[1], args[0]) == 0)
+           			{
+           			     if (min_valid_arguments[1] >= arg_count + 1)
+                		     {
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			continue;
+                			}
+                			echo(args);
+            			}
+			dup2(stdout_backup, STDOUT_FILENO);
+			close(stdout_backup);
 
 		}
-		input_fd = STDIN_FILENO;
-		output_fd = STDOUT_FILENO;
-		error_fd = STDERR_FILENO;
-
+		
+	
 	}
 	return 0;
 }

@@ -1,3 +1,13 @@
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdlib.h>
+#include "SimpleShell.h"
+
+extern const char* commands;
 
 
 void pwd()
@@ -149,10 +159,12 @@ void cd(char* new_dir)
 	return;
 }
 
-void type(const char * command)
+void type(char * command)
 {
+	printf("Here 2");
 	if(is_command_internal(command))
 	{
+		printf("Here 4");
 		printf("Internal Command\n");
 	}
 	else if(is_command_external(command))
@@ -165,11 +177,11 @@ void type(const char * command)
 	}
 }
 
-int is_command_internal(const char* command_type)
-{	
-	for(int i = 0 ; i < sizeof(commands)/sizeof(char *) ; i++)
+int is_command_internal(char* command_type)
+{	printf("Here intern 1");
+	for(int i = 0 ; i < 11 ; i++)
 	{
-		
+		printf("Here intern %d",i+2);
 		if(strcmp(command_type,commands[i])==0)
 		{
 			return 1;
@@ -178,7 +190,7 @@ int is_command_internal(const char* command_type)
 	return 0;
 }
 
-int is_command_external(const char* command_type)
+int is_command_external(char* command_type)
 {
 	char * path_env = getenv("PATH");
 	printf("Here 1\n");
@@ -328,42 +340,15 @@ void print_uptime_info()
 	printf("Idle Time: %.2f second\n",idle_time);
 }
 
-void execute_command(const char* command, char* const args[], int input_fd, int output_fd, int error_fd)
+int isThereRedirection(char* command)
 {
-	pid_t pid = fork();
-	if(pid < 0)
+	while(command != NULL)
 	{
-		perror("Fork");
-		exit(EXIT_FAILURE);
-	}
-
-	if(pid == 0)
-	{
-		if(input_fd != STDIN_FILENO)
+		if(command == '>' || command == '<')
 		{
-			dup2(input_fd, STDIN_FILENO);
-			close(input_fd);
+			return 1;
 		}
-
-		if(output_fd != STDOUT_FILENO)
-		{
-			dup2(output_fd, STDOUT_FILENO);
-			close(output_fd);
-		}
-
-		if(error_fd != STDERR_FILENO)
-		{
-			dup2(error_fd, STDERR_FILENO);
-			close(error_fd);
-		}	
-
-		execvp(command,args);
-		perror("execvp");
-		exit(EXIT_FAILURE);
-
+		command++;
 	}
-	else 
-	{
-		wait(NULL);
-	}
+	return 0;
 }

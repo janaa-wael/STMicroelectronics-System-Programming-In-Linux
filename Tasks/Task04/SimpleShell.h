@@ -17,12 +17,13 @@ int file_exist(char * file_name);
 void copy(char * sourcepath, char * targetpath, char flag);
 void move(char* sourcepath, char* targetpath);
 void cd(char* new_dir);
-void type(const char * command);
-int is_command_internal(const char* command_type);
-int is_command_external(const char* command_type);
+void type(char * command);
+int is_command_internal(char* command_type);
+int is_command_external(char* command_type);
 void print_env_var();
 void execute_commandd(const char *command, char *const args[]);
 void print_memory_info();
 void print_uptime_info();
-void execute_command(const char* command, char* const args[], int input_fd, int output_fd, int error_fd);
+int isThereRedirection(char* command);
+
 #endif
