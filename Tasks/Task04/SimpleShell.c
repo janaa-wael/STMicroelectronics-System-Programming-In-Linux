@@ -7,8 +7,8 @@
 #include <stdlib.h>
 #include "SimpleShell.h"
 
-extern const char* commands;
-
+extern const char* commands[];
+extern int min_valid_arguments[];
 
 void pwd()
 {
@@ -178,10 +178,9 @@ void type(char * command)
 }
 
 int is_command_internal(char* command_type)
-{	printf("Here intern 1");
+{	
 	for(int i = 0 ; i < 11 ; i++)
 	{
-		printf("Here intern %d",i+2);
 		if(strcmp(command_type,commands[i])==0)
 		{
 			return 1;
@@ -193,28 +192,28 @@ int is_command_internal(char* command_type)
 int is_command_external(char* command_type)
 {
 	char * path_env = getenv("PATH");
-	printf("Here 1\n");
+	//printf("Here 1\n");
 	if(path_env == NULL)
 	{
 
-		printf("Here 12\\n");
+		//printf("Here 12\\n");
 		perror("strdup");
 		return 0;
 	}
-	printf("Here 22");
+	//printf("Here 22");
 	char path[1024];
 	char *path_copy = strdup(path_env);
-	printf("Here 2\n");
+	//printf("Here 2\n");
 	if(path_copy == NULL)
 	{
 		perror("strdup");
 		return 0;
 	}
-	printf("Here 3\n");
+	//printf("Here 3\n");
 	char *dir = strtok(path_copy, ":");
 	while(dir != NULL)
 	{
-		printf("Here 4\n");
+		//printf("Here 4\n");
 		snprintf(path, sizeof(path), "%s/%s", dir, command_type);
 		if(access(path, X_OK) == 0)
 		{
@@ -223,9 +222,64 @@ int is_command_external(char* command_type)
 		}
 		dir = strtok(NULL, ":");
 	}
-	printf("Here 5");
+	//printf("Here 5");
 	free(path_copy);
 	return 0;
+}
+
+void execute_external_command(const char* command, char* const args[]) {
+    // Retrieve the PATH environment variable
+    char* path_env = getenv("PATH");
+    if (path_env == NULL) {
+        perror("getenv");
+        exit(EXIT_FAILURE);
+    }
+
+    // Duplicate the PATH variable for tokenization
+    char path_copy[1024];
+    strncpy(path_copy, path_env, sizeof(path_copy));
+    path_copy[sizeof(path_copy) - 1] = '\0';
+
+    // Tokenize the PATH variable into directories
+    char* dir = strtok(path_copy, ":");
+    while (dir != NULL) {
+        	// Construct the full path to the command
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir, command);
+
+        // Check if the command exists and is executable
+        if (access(full_path, X_OK) == 0) {
+            // Command found, fork a new process to execute it
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("fork");
+                exit(EXIT_FAILURE);
+            }
+
+            if (pid == 0) { // Child process
+                execv(full_path, args);
+                
+                // If execv returns, there was an error
+                perror("execv");
+                exit(EXIT_FAILURE);
+            } else { // Parent process
+                int status;
+                waitpid(pid, &status, 0); // Wait for the child process to finish
+                if (WIFEXITED(status)) {
+                    printf("Child exited with status %d\n", WEXITSTATUS(status));
+                } else if (WIFSIGNALED(status)) {
+                    printf("Child terminated by signal %d\n", WTERMSIG(status));
+                }
+                return; // Exit the function if command is executed
+            }
+        }
+        // Move to the next directory in PATH
+        dir = strtok(NULL, ":");
+    }
+
+    // If we reach here, the command was not found
+    fprintf(stderr, "Command not found: %s\n", command);
+    exit(EXIT_FAILURE);
 }
 
 void print_env_var()
@@ -351,4 +405,99 @@ int isThereRedirection(char* command)
 		command++;
 	}
 	return 0;
+}
+
+void redirection(char ** args,char arg_count)
+{
+	int stdout_backup = dup(STDOUT_FILENO);
+		
+			printf("1\n");
+			int redirect_fd = open(args[2], O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU);
+			if(redirect_fd < 0)
+			{
+				perror("Error opening file for redirection");
+				return;
+			}
+			printf("2\n");
+			if(dup2(redirect_fd, STDOUT_FILENO) < 0)
+			{
+				perror("Error redirecting stdout");
+				close(redirect_fd);
+				return;
+			}
+			//printf("3\n");
+			close(redirect_fd);
+			
+			if (strcmp(commands[0], args[0]) == 0)
+            		{
+            		    if (min_valid_arguments[0] >= arg_count + 1)
+            		    {
+                		    perror("Insufficient Arguments!");
+                		    dup2(stdout_backup, STDOUT_FILENO);
+                		    close(stdout_backup);
+                		    return;
+               	    	     }
+                	    pwd();
+            		}
+            		else if (strcmp(commands[1], args[0]) == 0)
+           		{
+           			     if (min_valid_arguments[1] >= arg_count + 1)
+                		     {
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			return;
+                		     }
+                			echo(args);
+            		}
+            		else if(strcmp(commands[3], args[0]) == 0)
+            		{
+            			if (min_valid_arguments[1] >= arg_count + 1)
+                		     {
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			return;
+                		     }
+                			help();
+            		}
+            		else if(strcmp(commands[8], args[0]) == 0)
+            		{
+            			if (min_valid_arguments[1] >= arg_count + 1)
+                		     {
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			return;
+                		     }
+                			print_env_var();
+            		}
+            		else if(strcmp(commands[9], args[0]) == 0)
+            		{
+            			if (min_valid_arguments[1] >= arg_count + 1)
+                		{
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			return;
+                		}
+                			print_memory_info();
+            		}
+            		else if(strcmp(commands[10], args[0]) == 0)
+            		{
+            			if (min_valid_arguments[1] >= arg_count + 1)
+                		{
+                    			perror("Insufficient Arguments!");
+                    			dup2(stdout_backup, STDOUT_FILENO);
+                		    	close(stdout_backup);
+                    			return;
+                		}
+                			print_uptime_info();
+            		}
+            		else if(is_command_external(args[0]))
+            		{
+            			execute_external_command(args[0],args);
+            		}
+			dup2(stdout_backup, STDOUT_FILENO);
+			close(stdout_backup);
 }
