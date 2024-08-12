@@ -25,7 +25,6 @@ void execute_commandd(const char *command, char *const args[]);
 void print_memory_info();
 void print_uptime_info();
 int isThereRedirection(char* command);
-void redirection(char ** args, char arg_count);
 void execute_external_command(const char* command, char* const args[]);
-
+void error_redirection(char *args[], char *command);
 #endif

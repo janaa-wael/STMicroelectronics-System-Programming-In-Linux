@@ -18,9 +18,11 @@ int main(int argc, char** argv)
 	char* args[MAX_ARGS];
 	ssize_t readSize = 0;
 	int arg_count = 0;
-	int redirection_flag = 0;
+	int output_redirection_flag = 0,error_redirection_flag = 0,input_redirection_flag = 0;
 	const char* shellMsg = "O2mor Ya Ghaly >> ";
 	while (1) {
+		memset(command, 0, sizeof(command));
+		
 		write(STDOUT, shellMsg, strlen(shellMsg));
 
 		readSize = read(STDIN, command, sizeof(command) - 1);
@@ -42,8 +44,12 @@ int main(int argc, char** argv)
 		redirection_flag = 0;
 		while (args[arg_count] != NULL && arg_count < MAX_ARGS - 1)
 		{
-			if(strcmp(args[arg_count],">") == 0 || strcmp(args[arg_count],"<") ==0)
-				redirection_flag = 1;
+			if(strcmp(args[arg_count],">") == 0) 
+				output_redirection_flag = 1;
+			else if(strcmp(args[arg_count],"<") ==0)
+				input_redirection_flag = 1;
+			else if(strcmp(args[arg_count],"2>") == 0)
+				error_redirection_flag = 1;
 			arg_count++;
 			args[arg_count] = strtok(NULL, " ");
 			
@@ -136,16 +142,22 @@ int main(int argc, char** argv)
 			}
 			else if(is_command_external(args[0]))
 			{
+			
 				execute_external_command(args[0], args);
 			}
 		}
 		
 		else if(redirection_flag == 1)
 		{
-			redirection(args,arg_count);
-
+			if(output_redirection_flag == 1)
+				output_redirection(args,arg_count);
+			else if(input_redirection_flag == 1)
+			
+			else if(error_redirection_flag == 1)
+				error_redirection(args,args[0]);
 		}
-		
+		fflush(stdout);
+		fflush(stdin);
 	
 	}
 	return 0;

@@ -217,7 +217,6 @@ int is_command_external(char* command_type)
 		snprintf(path, sizeof(path), "%s/%s", dir, command_type);
 		if(access(path, X_OK) == 0)
 		{
-			free(path_copy);
 			return 1;
 		}
 		dir = strtok(NULL, ":");
@@ -228,6 +227,8 @@ int is_command_external(char* command_type)
 }
 
 void execute_external_command(const char* command, char* const args[]) {
+    printf("I'm in execute_ext_comm\n");
+
     // Retrieve the PATH environment variable
     char* path_env = getenv("PATH");
     if (path_env == NULL) {
@@ -235,21 +236,22 @@ void execute_external_command(const char* command, char* const args[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Duplicate the PATH variable for tokenization
-    char path_copy[1024];
-    strncpy(path_copy, path_env, sizeof(path_copy));
-    path_copy[sizeof(path_copy) - 1] = '\0';
+    // Increase buffer size for path_copy
+    char path_copy[4096];
+    strncpy(path_copy, path_env, sizeof(path_copy) - 1);
+    path_copy[sizeof(path_copy) - 1] = '\0'; // Ensure null termination
 
     // Tokenize the PATH variable into directories
     char* dir = strtok(path_copy, ":");
     while (dir != NULL) {
-        	// Construct the full path to the command
+        // Construct the full path to the command
         char full_path[1024];
         snprintf(full_path, sizeof(full_path), "%s/%s", dir, command);
 
         // Check if the command exists and is executable
         if (access(full_path, X_OK) == 0) {
-            // Command found, fork a new process to execute it
+            printf("Trying to execute: %s\n", full_path);
+
             pid_t pid = fork();
             if (pid < 0) {
                 perror("fork");
@@ -281,6 +283,7 @@ void execute_external_command(const char* command, char* const args[]) {
     fprintf(stderr, "Command not found: %s\n", command);
     exit(EXIT_FAILURE);
 }
+
 
 void print_env_var()
 {
@@ -407,25 +410,24 @@ int isThereRedirection(char* command)
 	return 0;
 }
 
-void redirection(char ** args,char arg_count)
+void output_redirection(char ** args,char arg_count)
 {
 	int stdout_backup = dup(STDOUT_FILENO);
 		
-			printf("1\n");
 			int redirect_fd = open(args[2], O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU);
 			if(redirect_fd < 0)
 			{
 				perror("Error opening file for redirection");
 				return;
 			}
-			printf("2\n");
+			
 			if(dup2(redirect_fd, STDOUT_FILENO) < 0)
 			{
 				perror("Error redirecting stdout");
 				close(redirect_fd);
 				return;
 			}
-			//printf("3\n");
+			
 			close(redirect_fd);
 			
 			if (strcmp(commands[0], args[0]) == 0)
@@ -500,4 +502,40 @@ void redirection(char ** args,char arg_count)
             		}
 			dup2(stdout_backup, STDOUT_FILENO);
 			close(stdout_backup);
+}
+
+
+void error_redirection(char *args[], char *command) {
+    int stderr_backup = dup(STDERR_FILENO); // Backup stderr
+    
+    if (stderr_backup < 0) {
+        perror("Error backing up stderr");
+        return;
+    }
+
+    int redirect_fd = open(args[2], O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (redirect_fd < 0) {
+        perror("Error opening file for redirection");
+        close(stderr_backup); // Close the backup before returning
+        return;
+    }
+
+    if (dup2(redirect_fd, STDERR_FILENO) < 0) { // Redirect stderr to the file
+        perror("Error redirecting stderr");
+        close(redirect_fd);
+        close(stderr_backup);
+        return;
+    }
+
+    close(redirect_fd); // Close the file descriptor, no longer needed
+
+    // Execute the command
+    execvp(command, args);
+    
+    // If execvp returns, it means there was an error
+    perror("Error executing command");
+    
+    // Restore stderr
+    dup2(stderr_backup, STDERR_FILENO);
+    close(stderr_backup);
 }
