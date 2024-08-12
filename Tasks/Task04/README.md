@@ -74,9 +74,11 @@ You will be prompted with a custom shell message: `O2mor Ya Ghaly >>`. Enter com
 
 - **Copy File with Appending:**
 
-  ```
-  O2mor Ya Ghaly >> mycp source.txt destination.txt -a
-  ```
+  ``` To append the source file to the target file
+  O2mor Ya Ghaly >> mycp -a source.txt destination.txt 
+
+  ``` To copy the source file into a new path directory
+ O2mor Ya Ghaly >> mycp source.txt destination.txt
 
 - **Change Directory:**
 
