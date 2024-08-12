@@ -64,13 +64,27 @@ int file_exist(char * file_name)
 void copy(char * sourcepath, char * targetpath, char flag)
 {
 	int srcFd = open(sourcepath, O_RDONLY);
-	if(access(targetpath, F_OK) == 0)
+	if(access(targetpath, F_OK) == 0 && flag != 'a')
 	{
 		fprintf(stderr, "Error! Target file already exists!\n", targetpath);
 		close(srcFd);
 		return;
 	}
-	int trgFd = open(targetpath, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	int trgFd ;
+	if (flag == 'a') // Append mode
+    {
+        trgFd = open(targetpath, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    }
+    else // Overwrite mode
+    {
+        if (access(targetpath, F_OK) == 0)
+        {
+            fprintf(stderr, "Error! Target file already exists!\n");
+            close(srcFd);
+            return;
+        }
+        trgFd = open(targetpath, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    }
 	if(trgFd < 0)
 	{
 		perror("Error opening the target file\n");
@@ -227,7 +241,7 @@ int is_command_external(char* command_type)
 }
 
 void execute_external_command(const char* command, char* const args[]) {
-    printf("I'm in execute_ext_comm\n");
+    //printf("I'm in execute_ext_comm\n");
 
     // Retrieve the PATH environment variable
     char* path_env = getenv("PATH");

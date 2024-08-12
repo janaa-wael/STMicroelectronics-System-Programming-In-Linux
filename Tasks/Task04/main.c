@@ -29,21 +29,27 @@ int main(int argc, char** argv)
 		write(STDOUT, shellMsg, strlen(shellMsg));
 
 		readSize = read(STDIN, command, sizeof(command) - 1);
-
+		
 		if (readSize <= 0)
 		{
 			perror("read");
 			continue;
 		}
 		command[readSize] = '\0';
+		
+	
+			
 		if (readSize > 0 && command[readSize - 1] == '\n')
 		{
 			command[readSize - 1] = '\0';
 		}
-
+		if(strlen(command) == 0)
+			continue;
+			
 		/* get the first token */
 		args[arg_count] = strtok(command, " ");
-		printf("t");
+		
+		
 		
 		while (args[arg_count] != NULL && arg_count < MAX_ARGS - 1)
 		{
@@ -61,10 +67,14 @@ int main(int argc, char** argv)
 		}
 
 		args[arg_count] = NULL;
+		if(arg_count == 1)
+			args[0] = command;
 		if(output_redirection_flag == 0 && error_redirection_flag == 0 && input_redirection_flag == 0 && pipe_flag == 0) normal_flag = 1;
 		printf("out redirect = %d\n",output_redirection_flag);
 		/* walk through other tokens */
-		if(normal_flag)
+		if(command == '\n')
+			continue;
+		else if(normal_flag)
 		{
 			if (strcmp(commands[0], args[0]) == 0)
 			{
@@ -122,8 +132,10 @@ int main(int argc, char** argv)
 					perror("Insufficient Arguments!");
 					continue;
 				}
-
-				copy(args[1], args[2], 0);
+				if(arg_count > 3 && strcmp(args[1],"-a") == 0)
+					copy(args[2], args[3], 'a');
+				else
+					copy(args[1], args[2], 0);
 			}
 			else if (strcmp(commands[6], args[0]) == 0)
 			{
@@ -165,6 +177,7 @@ int main(int argc, char** argv)
 		{
 			pipe_with_grep(args[0],"grep",args[3]);	
 		}
+		
 		fflush(stdout);
 		fflush(stdin);
 	
