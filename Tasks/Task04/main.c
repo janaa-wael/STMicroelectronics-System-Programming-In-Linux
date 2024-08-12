@@ -18,11 +18,14 @@ int main(int argc, char** argv)
 	char* args[MAX_ARGS];
 	ssize_t readSize = 0;
 	int arg_count = 0;
-	int output_redirection_flag = 0,error_redirection_flag = 0,input_redirection_flag = 0;
+	
 	const char* shellMsg = "O2mor Ya Ghaly >> ";
 	while (1) {
-		memset(command, 0, sizeof(command));
+		int output_redirection_flag = 0,error_redirection_flag = 0,input_redirection_flag = 0, pipe_flag = 0,normal_flag = 0;
+		arg_count = 0;
 		
+		memset(command, 0, sizeof(command));
+		memset(args, 0, sizeof(args));
 		write(STDOUT, shellMsg, strlen(shellMsg));
 
 		readSize = read(STDIN, command, sizeof(command) - 1);
@@ -41,7 +44,7 @@ int main(int argc, char** argv)
 		/* get the first token */
 		args[arg_count] = strtok(command, " ");
 		printf("t");
-		redirection_flag = 0;
+		
 		while (args[arg_count] != NULL && arg_count < MAX_ARGS - 1)
 		{
 			if(strcmp(args[arg_count],">") == 0) 
@@ -50,16 +53,18 @@ int main(int argc, char** argv)
 				input_redirection_flag = 1;
 			else if(strcmp(args[arg_count],"2>") == 0)
 				error_redirection_flag = 1;
+			else if(strcmp(args[arg_count],"grep")==0)
+				pipe_flag = 1;		
 			arg_count++;
 			args[arg_count] = strtok(NULL, " ");
 			
 		}
 
 		args[arg_count] = NULL;
-		
-		printf("redirect = %d\n",redirection_flag);
+		if(output_redirection_flag == 0 && error_redirection_flag == 0 && input_redirection_flag == 0 && pipe_flag == 0) normal_flag = 1;
+		printf("out redirect = %d\n",output_redirection_flag);
 		/* walk through other tokens */
-		if(redirection_flag == 0)
+		if(normal_flag)
 		{
 			if (strcmp(commands[0], args[0]) == 0)
 			{
@@ -147,14 +152,18 @@ int main(int argc, char** argv)
 			}
 		}
 		
-		else if(redirection_flag == 1)
+		else if(output_redirection_flag== 1 || input_redirection_flag== 1 || error_redirection_flag== 1)
 		{
 			if(output_redirection_flag == 1)
 				output_redirection(args,arg_count);
 			else if(input_redirection_flag == 1)
-			
+				input_redirection(args,args[0]);
 			else if(error_redirection_flag == 1)
 				error_redirection(args,args[0]);
+		}
+		else if(pipe_flag == 1)
+		{
+			pipe_with_grep(args[0],"grep",args[3]);	
 		}
 		fflush(stdout);
 		fflush(stdin);

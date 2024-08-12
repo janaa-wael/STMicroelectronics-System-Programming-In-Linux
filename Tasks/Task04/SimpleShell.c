@@ -401,7 +401,7 @@ int isThereRedirection(char* command)
 {
 	while(command != NULL)
 	{
-		if(command == '>' || command == '<')
+		if(command == '>' || command == '<' || command == "2>")
 		{
 			return 1;
 		}
@@ -538,4 +538,61 @@ void error_redirection(char *args[], char *command) {
     // Restore stderr
     dup2(stderr_backup, STDERR_FILENO);
     close(stderr_backup);
+}
+
+void input_redirection(char *args[], char *command)
+{
+
+}
+
+void pipe_with_grep(const char *cmd1, const char *cmd2, const char *search_term) {
+    int pipeFd[2];
+
+    // Create a pipe
+    if (pipe(pipeFd) == -1) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    // Fork the first child process
+    pid_t pid1 = fork();
+    if (pid1 == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid1 == 0) { // First child process
+        close(pipeFd[0]); // Close unused read end
+        dup2(pipeFd[1], STDOUT_FILENO); // Redirect stdout to pipe
+        close(pipeFd[1]); // Close the original write end
+
+        execlp(cmd1, cmd1, NULL); // Execute the first command
+        perror("execlp");
+        exit(EXIT_FAILURE);
+    }
+
+    // Fork the second child process
+    pid_t pid2 = fork();
+    if (pid2 == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid2 == 0) { // Second child process
+        close(pipeFd[1]); // Close unused write end
+        dup2(pipeFd[0], STDIN_FILENO); // Redirect stdin to pipe
+        close(pipeFd[0]); // Close the original read end
+
+        execlp("grep", "grep", search_term, NULL); // Execute grep
+        perror("execlp");
+        exit(EXIT_FAILURE);
+    }
+
+    // Parent process
+    close(pipeFd[0]); // Close both ends of the pipe in the parent
+    close(pipeFd[1]);
+
+    // Wait for both child processes to finish
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
 }

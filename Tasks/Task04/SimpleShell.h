@@ -27,4 +27,6 @@ void print_uptime_info();
 int isThereRedirection(char* command);
 void execute_external_command(const char* command, char* const args[]);
 void error_redirection(char *args[], char *command);
+void input_redirection(char *args[], char *command);
+void pipe_with_grep(const char *cmd1, const char *cmd2, const char *search_term);
 #endif
