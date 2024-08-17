@@ -15,5 +15,5 @@ void split(struct block *fitting_slot,size_t size);
 void* MyMalloc(size_t num_of_bytes);
 void merge();
 void MyFree(void* ptr);
-
+int isBlockAllocated(void* ptr);
 #endif

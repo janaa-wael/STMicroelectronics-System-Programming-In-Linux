@@ -50,6 +50,8 @@ void* MyMalloc(size_t num_of_bytes)
 	void *result;
 	
 	/*If the memory pool is not initialized, initialize() is called to set it up. */
+	if(num_of_bytes == 0)
+		return NULL;
 	if(!(List_Of_Free_Blocks->size)){ 
 		initialize();
 		printf("Memory initialized\n");
@@ -94,6 +96,17 @@ void merge() {
 
 void MyFree(void *ptr) {
 	
+	if(isBlockAllocated(ptr)==0)
+	{
+		printf("Block already freed.\n");
+		return;
+	}
+	if(ptr == NULL)
+		printf("Pointer is NULL\n");
+	if(((struct block*)ptr)->free == 1)
+	{
+		printf("Memory block isn't allocated. It's already free");
+	}
     /* Verifies if the pointer provided is within the range of the memory pool. */
 	if(((void*)simulated_heap <= ptr) && (ptr <= (void*)(simulated_heap + HEAP_SIZE))) {
         struct block* curr = ptr;
@@ -105,4 +118,19 @@ void MyFree(void *ptr) {
     }
 }
 
-
+int isBlockAllocated(void* ptr)
+{
+	struct block* metadata_block = simulated_heap;
+	
+	
+	while(metadata_block != NULL)
+	{
+		void* block_start = (char*)metadata_block + sizeof(struct block);
+		if(block_start == ptr)
+			return 1;
+		
+		metadata_block = metadata_block -> next;
+		
+	}
+	return 0;
+}

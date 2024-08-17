@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "HMM.h"
 
-char simulated_heap;
+char simulated_heap[HEAP_SIZE];
 
 void debug_heap() {
     struct block* curr = (struct block*)simulated_heap;
@@ -31,14 +31,10 @@ int main()
 {
 	// Initialize the heap
     initialize();
-
+    printf("size = %d",sizeof(struct block));
     // Perform allocations, deallocations, and debugging
     void* ptr1 = MyMalloc(100);
-    void* ptr2 = MyMalloc(200);
-
     debug_heap();
-
-    MyFree(ptr1);
-
-    debug_heap();
+    void* ptr2 = ptr1 + sizeof(struct block);
+    MyFree(ptr2);
 }
