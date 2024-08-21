@@ -52,14 +52,14 @@ void* MyMalloc(size_t num_of_bytes)
 	/* Handling corner case of free list not being initialized. */	
 	if(List_Of_Free_Blocks == NULL)
 	{
-		printf("List of free blocks isn't initialized.\n");
+		//printf("List of free blocks isn't initialized.\n");
 		return;
 	}
 	
 	/*If the memory pool is not initialized, initialize() is called to set it up. */
 	if(!(List_Of_Free_Blocks->size)){ 
 		initialize();
-		printf("Memory initialized\n");
+		//printf("Memory initialized\n");
 	}
 	
 	curr = List_Of_Free_Blocks;
@@ -67,37 +67,37 @@ void* MyMalloc(size_t num_of_bytes)
 	{
 		if(program_break + PROGRAM_BREAK_INCREMENT < program_break)
 		{
-			printf("Overflow flow in the value of program break");
+			//printf("Overflow flow in the value of program break");
 			return NULL;
 		}
-		program_break += PROGRAM_BREAK_INCERMENT;
+		program_break += PROGRAM_BREAK_INCREMENT;
 	}
 	
 	while((((curr->size)<num_of_bytes)||((curr->free)==0))&&(curr->next!=NULL))
 	{
 		prev=curr;
 		curr=curr->next;
-		printf("One block checked\n");
+		//printf("One block checked\n");
 	}
 	
 	if ((curr->size) == num_of_bytes) 
 	{
         	curr->free = 0;
         	result = (void*)(++curr);
-        	printf("Exact fitting block allocated\n");
+        	//printf("Exact fitting block allocated\n");
         	return result;
     	} 
     	else if((curr->size) > (num_of_bytes + sizeof(struct block))) 
     	{
         	split(curr, num_of_bytes);
         	result = (void*)(++curr);
-        	printf("Fitting block allocated with a split\n");
+        	//printf("Fitting block allocated with a split\n");
         	return result;
     	} 
     	else 
     	{
         	result = NULL;
-        	printf("Sorry. No sufficient memory to allocate\n");
+        	//printf("Sorry. No sufficient memory to allocate\n");
         	return result;
     	}
 }
