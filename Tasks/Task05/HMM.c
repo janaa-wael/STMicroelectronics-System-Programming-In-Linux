@@ -3,17 +3,13 @@
 #include <string.h>
 #include "HMM.h"
 
-extern char simulated_heap[HEAP_SIZE];
-
-/* Metadata Block Structure; Block contains info of data about the data */
-
-struct block *List_Of_Free_Blocks = (void*)(simulated_heap);
-
-static char *program_break = simulated_heap;
+char simulated_heap[HEAP_SIZE];
+struct block *List_Of_Free_Blocks = (void*)(simulated_heap); /* Metadata Block Structure; Block contains info of data about the data */
+static char *program_break = simulated_heap; /* Program break initially points to the beginning of the HEAP */
 
 void initialize()
 {
-	/* the size of blthe ock that the metadata describes is the size of the heap - the size of the metadata block*/
+	/* the size of the block that the metadata describes is the size of the heap - the size of the metadata block*/
 	List_Of_Free_Blocks -> size = HEAP_SIZE - sizeof(struct block);
 	
 	/* The free flag = 1 indicates that the block is initially free */
@@ -49,35 +45,61 @@ void* MyMalloc(size_t num_of_bytes)
 	struct block* curr, *prev;
 	void *result;
 	
-	/*If the memory pool is not initialized, initialize() is called to set it up. */
+	
 	if(num_of_bytes == 0)
 		return NULL;
+		
+	/* Handling corner case of free list not being initialized. */	
+	if(List_Of_Free_Blocks == NULL)
+	{
+		printf("List of free blocks isn't initialized.\n");
+		return;
+	}
+	
+	/*If the memory pool is not initialized, initialize() is called to set it up. */
 	if(!(List_Of_Free_Blocks->size)){ 
 		initialize();
 		printf("Memory initialized\n");
 	}
+	
 	curr = List_Of_Free_Blocks;
-	while((((curr->size)<num_of_bytes)||((curr->free)==0))&&(curr->next!=NULL)){
+	while(num_of_bytes > ProgBrkOffset())
+	{
+		if(program_break + PROGRAM_BREAK_INCREMENT < program_break)
+		{
+			printf("Overflow flow in the value of program break");
+			return NULL;
+		}
+		program_break += PROGRAM_BREAK_INCERMENT;
+	}
+	
+	while((((curr->size)<num_of_bytes)||((curr->free)==0))&&(curr->next!=NULL))
+	{
 		prev=curr;
 		curr=curr->next;
 		printf("One block checked\n");
 	}
 	
-	if ((curr->size) == num_of_bytes) {
-        curr->free = 0;
-        result = (void*)(++curr);
-        printf("Exact fitting block allocated\n");
-        return result;
-    } else if ((curr->size) > (num_of_bytes + sizeof(struct block))) {
-        split(curr, num_of_bytes);
-        result = (void*)(++curr);
-        printf("Fitting block allocated with a split\n");
-        return result;
-    } else {
-        result = NULL;
-        printf("Sorry. No sufficient memory to allocate\n");
-        return result;
-    }
+	if ((curr->size) == num_of_bytes) 
+	{
+        	curr->free = 0;
+        	result = (void*)(++curr);
+        	printf("Exact fitting block allocated\n");
+        	return result;
+    	} 
+    	else if((curr->size) > (num_of_bytes + sizeof(struct block))) 
+    	{
+        	split(curr, num_of_bytes);
+        	result = (void*)(++curr);
+        	printf("Fitting block allocated with a split\n");
+        	return result;
+    	} 
+    	else 
+    	{
+        	result = NULL;
+        	printf("Sorry. No sufficient memory to allocate\n");
+        	return result;
+    	}
 }
 
 
@@ -133,4 +155,32 @@ int isBlockAllocated(void* ptr)
 		
 	}
 	return 0;
+}
+
+void debug_heap() {
+    struct block* curr = (struct block*)simulated_heap;
+    int block_number = 0;
+
+    printf("Heap Debugging Information:\n");
+    printf("-----------------------------------------------------------------\n");
+    printf("| Block # | Address      | Size        | Free/Allocated | Next Address |\n");
+    printf("-----------------------------------------------------------------\n");
+
+    while (curr != NULL) {
+        printf("| %7d | %12p | %11zu | %14s | %12p |\n", 
+               block_number,
+               (void*)curr,
+               curr->size,
+               curr->free ? "Free" : "Allocated",
+               (void*)curr->next);
+        curr = curr->next;
+        block_number++;
+    }
+
+    printf("-----------------------------------------------------------------\n");
+}
+
+int ProgBrkOffset()
+{
+	return (program_break - simulated_heap);
 }
