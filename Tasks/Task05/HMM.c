@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <limits.h>
+#include <assert.h>
 #include "HMM.h"
 
 char simulated_heap[HEAP_SIZE];
@@ -106,13 +110,36 @@ void* MyMalloc(size_t num_of_bytes)
 void merge() {
     struct block *curr, *prev;
     curr = List_Of_Free_Blocks;
-    while ((curr->next) != NULL) {
-        if ((curr->free) && (curr->next->free)) {
+    if (curr == NULL) {
+        // No blocks to merge
+        return;
+    }
+
+    while (curr != NULL && curr->next != NULL) {
+        // Ensure pointers are valid
+        assert(curr != NULL);
+        assert(curr->next != NULL);
+
+        //printf("Current block: size = %zu, free = %d\n", curr->size, curr->free);
+        //printf("Next block: size = %zu, free = %d\n", curr->next->size, curr->next->free);
+
+        // Check if both blocks are free
+        if (curr->free && curr->next->free) {
+            // Ensure we don't have size overflow
+            if (curr->size > SIZE_MAX - (curr->next->size + sizeof(struct block))) {
+                printf("Size overflow detected. Skipping merge.\n");
+                curr = curr->next; // Move to next block
+                continue;
+            }
+
+            // Merge the blocks
             curr->size += (curr->next->size) + sizeof(struct block);
             curr->next = curr->next->next;
+        } else {
+            // Move to the next block
+            prev = curr;
+            curr = curr->next;
         }
-        prev = curr;
-        curr = curr->next;
     }
 }
 
