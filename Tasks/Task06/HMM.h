@@ -1,7 +1,8 @@
 #ifndef HMM_H
 #define HMM_H
+#include <string.h>
 
-#define HEAP_SIZE			1024*1024
+#define HEAP_SIZE			50
 #define PROGRAM_BREAK_INCREMENT		500 
 struct block{
     size_t size;			//size of block it refers to  
@@ -22,6 +23,8 @@ void free(void* ptr);
 void* MyCalloc(size_t nmemb, size_t size);
 void* MyRealloc(void* ptr, size_t size);
 void* increase_block_size(void* ptr, size_t requested_size);
+void copy_block_contents(void* ptr1, void* ptr2);
+void debug_heap();
 void* dec_block_size(void* ptr, size_t size);
 void* Realloc2(void * ptr, size_t size);
 #endif

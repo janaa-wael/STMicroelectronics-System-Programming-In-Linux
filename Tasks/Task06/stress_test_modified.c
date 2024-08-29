@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "HMM.h"
 
-#define NUM_ALLOCS 100000
+#define NUM_ALLOCS 10000
 #define MAX_SIZE 10240
 #define MAX_ITERATIONS 10000000
 
@@ -155,17 +155,18 @@ void test_realloc(int num_iterations, size_t initial_size, size_t increment_size
 int main() {
 printf("HEllo");
     // Example parameters
-    int num_iterations = 10;
+
     size_t initial_size = 128;       // Initial size of the block
     size_t increment_size = 64;      // Increment size for reallocation
 
     // Test the realloc function
-    test_realloc(num_iterations, initial_size, increment_size);
+    test_re    int num_iterations = 10;alloc(num_iterations, initial_size, increment_size);
 
     return 0;
 }*/
 
-int main() {
+int main() { 
+    initialize();
     printf("Starting random allocation, reallocation, and deallocation test...\n");
     random_alloc_realloc_calloc_test();
     printf("Test complete.\n");

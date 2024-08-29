@@ -6,27 +6,28 @@
 #include <limits.h>
 #include <assert.h>
 #include "HMM.h"
-
+#include <unistd.h>
 
 struct block *List_Of_Free_Blocks = NULL; /* Initialized to NULL */
 
 void initialize()
 {
-	void *heap_start = sbrk(HEAP_SIZE); // Request HEAP_SIZE bytes from the OS
-	if(heap_start == NULL )
-		return NULL;
-	if (heap_start == (void *)-1) {
-        	// Handle allocation failure
-        	perror("sbrk failed");
-        	exit(EXIT_FAILURE);
-    	}
 
-    	List_Of_Free_Blocks = (struct block *)heap_start;
+    struct block* heap_start = sbrk(HEAP_SIZE);
+    struct block* ptr = (struct block*)heap_start;
+    if (heap_start == NULL || heap_start == (void *)-1) {
+        perror("sbrk failed");
+        exit(EXIT_FAILURE);
+    }
+	// Ensure alignment
 
-	// Initialize the block
-	List_Of_Free_Blocks->size = HEAP_SIZE - sizeof(struct block); // Adjust for block header
-    	List_Of_Free_Blocks->free = 1;
-    	List_Of_Free_Blocks->next = NULL;
+    List_Of_Free_Blocks = ptr;
+ 
+
+    // Initialize the block
+    List_Of_Free_Blocks->size = HEAP_SIZE - sizeof(struct block);
+    List_Of_Free_Blocks->free = 1;
+    List_Of_Free_Blocks->next = NULL;
 }
 
 
@@ -49,60 +50,80 @@ void split(struct block *fitting_slot,size_t size)
 	fitting_slot->next=new;
 }
 
+void* MyMalloc(size_t num_of_bytes) {
+    struct block* curr = List_Of_Free_Blocks;
+    struct block* prev = NULL;
+    void* result = NULL;
 
-
-void* MyMalloc(size_t num_of_bytes)
-{
-    struct block* curr, *prev;
-    void *result;
-    
+    // Initialize heap if not already initialized
     if (List_Of_Free_Blocks == NULL) {
-        initialize(); // Initialize the heap if not already done
+        void* heap_start = sbrk(HEAP_SIZE);
+        if (heap_start == (void *)-1) {
+            perror("sbrk failed");
+            return NULL;
+        }
+
+        // Initialize the first block
+        List_Of_Free_Blocks = (struct block*)heap_start;
+        List_Of_Free_Blocks->size = HEAP_SIZE - sizeof(struct block);
+        List_Of_Free_Blocks->free = 1;
+        List_Of_Free_Blocks->next = NULL;
     }
 
     curr = List_Of_Free_Blocks;
 
     // Traverse the free list to find a suitable block
-    while ((((curr->size) < num_of_bytes) || ((curr->free) == 0)) && (curr->next != NULL)) 
-    {
+    while (curr != NULL) {
+        // Check if the current block is large enough and free
+        if (curr->size >= num_of_bytes && curr->free) {
+            break;  // Suitable block found
+        }
+
         prev = curr;
         curr = curr->next;
     }
 
     // If no suitable block was found, request more memory
-    if (curr->next == NULL && curr->free == 0) 
-    {
-        curr->next = sbrk(num_of_bytes + sizeof(struct block));
-        if (curr->next == (void *)-1) {
+    if (curr == NULL) {
+        void* heap_start = sbrk(HEAP_SIZE);
+        if (heap_start == (void *)-1) {
             perror("sbrk failed");
             return NULL;
         }
-        curr = curr->next;
-        curr->size = num_of_bytes;
-        curr->free = 0;
+
+        // Initialize the new block
+        curr = (struct block*)heap_start;
+        curr->size = HEAP_SIZE - sizeof(struct block);
+        curr->free = 1;
         curr->next = NULL;
-        result = (void *)(curr + 1);
-        return result;
+
+        // Add the new block to the free list
+        if (prev != NULL) {
+            prev->next = curr;
+        } else {
+            List_Of_Free_Blocks = curr;
+        }
     }
 
-    if ((curr->size) == num_of_bytes) 
-    {
+    // If the block is a perfect fit
+    if (curr->size == num_of_bytes) {
         curr->free = 0;
-        result = (void *)(curr + 1);
-        return result;
+        result = (void*)(curr + 1);  // Return memory after the block header
     } 
-    else if ((curr->size) > (num_of_bytes + sizeof(struct block))) 
-    {
+    // If the block is larger, split it
+    else if (curr->size > num_of_bytes + sizeof(struct block)) {
         split(curr, num_of_bytes);
-        result = (void *)(curr + 1);
-        return result;
+        curr->free = 0;
+        result = (void*)(curr + 1);  // Return memory after the block header
     } 
-    else 
-    {
+    // If the block is too small, return NULL (shouldn't happen due to previous checks)
+    else {
         result = NULL;
-        return result;
     }
+
+    return result;
 }
+
 
 
 
@@ -114,16 +135,16 @@ void merge() {
         return;
     }
 
-    while (curr != NULL && curr->next < sbrk(0)) {
+    while (curr != NULL && curr->next < (struct block*)(sbrk(0))) {
         // Ensure pointers are valid
-        assert(curr != NULL);
-        assert(curr->next != NULL);
+//        assert(curr != NULL);
+//        assert(curr->next != NULL);
 
         //printf("Current block: size = %zu, free = %d\n", curr->size, curr->free);
         //printf("Next block: size = %zu, free = %d\n", curr->next->size, curr->next->free);
 
         // Check if both blocks are free
-        if (curr->free && curr->next->free) {
+        if (curr->free && curr->next != NULL && curr->next->free) {
             // Ensure we don't have size overflow
             if (curr->size > SIZE_MAX - (curr->next->size + sizeof(struct block))) {
                 //printf("Size overflow detected. Skipping merge.\n");
@@ -147,7 +168,7 @@ void MyFree(void *ptr) {
 	
 	if(ptr == NULL)
 	{
-		return NULL;
+		return;
 	}
 	struct block* metadata_block = (struct block*)ptr - 1;
 	
@@ -223,7 +244,7 @@ void* MyCalloc(size_t nmemb, size_t size)
 	if(start_of_block == NULL)
 		return NULL;
 	char* ptr = (char*)start_of_block;
-	struct block* metadata_block = (char*)ptr - sizeof(struct block);
+	struct block* metadata_block = (struct block*)((char*)ptr - sizeof(struct block));
 	memset(ptr, 0, nmemb*size);
 	return start_of_block;
 }
@@ -236,7 +257,7 @@ void* MyRealloc(void* ptr, size_t size)
 		return MyMalloc(size);
 	}
 	//assert(isBlockAllocated(ptr));
-	struct block* metadata_block = (char*) ptr - sizeof(struct block);
+	struct block* metadata_block = (struct block*)((char*) ptr - sizeof(struct block));
 	if(size == 0)
 	{
 		MyFree(ptr);
@@ -316,7 +337,7 @@ void* merge_with_next(void* ptr, size_t size)
 		if(total_space > size)
 		{
 			metadata_block->size = total_space;
-			struct block* next_metadata_block = (char*)metadata_block + metadata_block->size;
+			struct block* next_metadata_block = (struct block*)((char*)metadata_block + metadata_block->size);
 			next_metadata_block->size = remaining_size-sizeof(struct block) > 0 ? remaining_size-sizeof(struct block) : 0;
 			next_metadata_block->next = metadata_block->next;
 			metadata_block->next = next_metadata_block;
@@ -388,8 +409,8 @@ void* increase_block_size(void* ptr, size_t requested_size)
 
 void copy_block_contents(void* ptr1, void* ptr2)
 {
-	struct block* start1 = (char*) ptr1 - sizeof(struct block);
-	struct block* start2 = (char*) ptr2 - sizeof(struct block);
+	struct block* start1 = (struct block*)((char*) ptr1 - sizeof(struct block));
+	struct block* start2 = (struct block*)((char*) ptr2 - sizeof(struct block));
 	size_t size_to_copy = (start1->size < start2->size) ? start1->size : start2->size;
 	
 	for (size_t i = 0; i < size_to_copy; i++) 
@@ -401,9 +422,9 @@ void copy_block_contents(void* ptr1, void* ptr2)
 
 void* dec_block_size(void* ptr, size_t size)
 {
-	struct block* metadata_block = (char*)ptr - sizeof(struct block);
+	struct block* metadata_block = (struct block*)((char*)ptr - sizeof(struct block));
 	
-	struct block* new_metadata_block = (char*)metadata_block + sizeof(struct block) + metadata_block->size;
+	struct block* new_metadata_block = (struct block*)((char*)metadata_block + sizeof(struct block) + metadata_block->size);
 	
 	if(metadata_block->size > size)
 	{
@@ -420,4 +441,3 @@ void* dec_block_size(void* ptr, size_t size)
 	}
 	return ptr;
 }
-

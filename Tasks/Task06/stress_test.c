@@ -109,8 +109,10 @@ void random_alloc_realloc_calloc_test() {
     }
 }
 
+
+
 int main() {
-	initialize();
+    initialize();
     printf("Starting random allocation, reallocation, and deallocation test...\n");
     random_alloc_realloc_calloc_test();
     printf("Test complete.\n");
