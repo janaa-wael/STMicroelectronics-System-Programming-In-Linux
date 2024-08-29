@@ -228,16 +228,6 @@ void debug_heap() {
 }
 
 
-void* malloc(size_t size)
-{
-	return MyMalloc(size);	
-}
-
-void free(void* ptr)
-{
-	MyFree(ptr);	
-}
-
 void* MyCalloc(size_t nmemb, size_t size)
 {
 	void* start_of_block = MyMalloc(nmemb*size);
@@ -268,7 +258,7 @@ void* MyRealloc(void* ptr, size_t size)
 	
 	
 }
-
+/*
 void* Realloc2(void * ptr, size_t size)
 {
     if (ptr == NULL) {
@@ -326,6 +316,7 @@ void* Realloc2(void * ptr, size_t size)
     return new_ptr;
 
 }
+*/
 
 void* merge_with_next(void* ptr, size_t size)
 {
@@ -440,4 +431,23 @@ void* dec_block_size(void* ptr, size_t size)
 		return (char*)metadata_block + sizeof(struct block);
 	}
 	return ptr;
+}
+
+void* malloc(size_t size)
+{
+	return MyMalloc(size);	
+}
+
+void free(void* ptr)
+{
+	MyFree(ptr);	
+}
+void* calloc(size_t nmemb, size_t size)
+{
+	return MyCalloc(nmemb,size);
+}
+
+void *realloc(void *_Nullable ptr, size_t size)
+{
+	return MyRealloc(ptr, size);
 }

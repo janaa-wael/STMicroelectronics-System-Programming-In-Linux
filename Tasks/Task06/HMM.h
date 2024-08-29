@@ -2,7 +2,7 @@
 #define HMM_H
 #include <string.h>
 
-#define HEAP_SIZE			50
+#define HEAP_SIZE			1024*1024*20
 #define PROGRAM_BREAK_INCREMENT		500 
 struct block{
     size_t size;			//size of block it refers to  
