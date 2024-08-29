@@ -447,7 +447,7 @@ void* calloc(size_t nmemb, size_t size)
 	return MyCalloc(nmemb,size);
 }
 
-void *realloc(void *_Nullable ptr, size_t size)
+void *realloc(void * ptr, size_t size)
 {
 	return MyRealloc(ptr, size);
 }
