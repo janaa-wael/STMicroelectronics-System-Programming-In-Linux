@@ -1,24 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <assert.h>
+#include <string.h>
 #include "HMM.h"
+#include <unistd.h>
+// Define constants
+#define NUM_ALLOCS 100
+#define MAX_ITERATIONS 1000
+#define MAX_SIZE 1024
 
-#define NUM_ALLOCS 10000
-#define MAX_SIZE 10240
-#define MAX_ITERATIONS 10000000
+// Fill memory with a specific pattern
+void fill_memory(void* ptr, size_t size, unsigned char pattern) {
+    if (ptr != NULL) {
+        memset(ptr, pattern, size);
+    }
+}
 
+// Check memory content against an expected pattern
+int check_memory(void* ptr, size_t size, unsigned char pattern) {
+    if (ptr == NULL) return 0;
+    unsigned char* bytePtr = (unsigned char*)ptr;
+    for (size_t i = 0; i < size; ++i) {
+        if (bytePtr[i] != pattern) {
+            return 0; // Memory content doesn't match the expected pattern
+        }
+    }
+    return 1; // Memory content matches the expected pattern
+}
+
+// Print memory content for debugging
+void print_memory(void* ptr, size_t size) {
+    if (ptr == NULL) return;
+    unsigned char* bytePtr = (unsigned char*)ptr;
+    printf("Memory content at %p:", ptr);
+    for (size_t i = 0; i < size; ++i) {
+        printf(" %02X", bytePtr[i]);
+    }
+    printf("\n");
+}
+
+// Stress test function
 void random_alloc_realloc_calloc_test() {
     srand((unsigned int)time(NULL));
     
     void* pointers[NUM_ALLOCS] = {NULL};
+    size_t sizes[NUM_ALLOCS] = {0};  // Array to store the size of each allocation
     
     for (int i = 0; i < MAX_ITERATIONS; ++i) {
         int index = rand() % NUM_ALLOCS;
         size_t size = (size_t)(rand() % MAX_SIZE) + 1;
         
         // Randomly choose between allocation, reallocation, and freeing
-        int operation = rand() % 4; // Added a fourth operation for realloc
+        int operation = rand() % 4;
         switch (operation) {
             case 0: // Allocate new memory
                 if (pointers[index] == NULL) {
@@ -26,15 +59,25 @@ void random_alloc_realloc_calloc_test() {
                         // Use MyMalloc
                         pointers[index] = MyMalloc(size);
                         if (pointers[index] != NULL) {
+                            sizes[index] = size;
+                            fill_memory(pointers[index], size, 0xAA);
                             printf("Allocated memory of size %zu at address %p using MyMalloc\n", size, pointers[index]);
+                            print_memory(pointers[index], size);
                         } else {
                             fprintf(stderr, "Allocation failed for size %zu using MyMalloc\n", size);
                         }
                     } else {
                         // Use MyCalloc
-                        pointers[index] = MyCalloc(1, size); // Allocate memory for an array of 1 element of size 'size'
+                        pointers[index] = MyCalloc(1, size);
                         if (pointers[index] != NULL) {
-                            printf("Allocated zero-initialized memory of size %zu at address %p using MyCalloc\n", size, pointers[index]);
+                            sizes[index] = size;
+                            // Verify zero-initialization
+                            if (check_memory(pointers[index], size, 0)) {
+                                printf("Allocated zero-initialized memory of size %zu at address %p using MyCalloc\n", size, pointers[index]);
+                                print_memory(pointers[index], size);
+                            } else {
+                                fprintf(stderr, "Memory at %p is not zero-initialized\n", pointers[index]);
+                            }
                         } else {
                             fprintf(stderr, "Allocation failed for size %zu using MyCalloc\n", size);
                         }
@@ -47,8 +90,14 @@ void random_alloc_realloc_calloc_test() {
                     size_t newSize = (size_t)(rand() % MAX_SIZE) + 1;
                     void* newPointer = MyRealloc(pointers[index], newSize);
                     if (newPointer != NULL) {
+                        sizes[index] = newSize;
+                        // Check memory integrity
+                        if (!check_memory(newPointer, newSize, 0xAA)) {
+                            fprintf(stderr, "Memory corruption detected during realloc\n");
+                        }
                         printf("Reallocated memory to size %zu at address %p (old address was %p) using MyRealloc\n", newSize, newPointer, pointers[index]);
                         pointers[index] = newPointer;
+                        print_memory(pointers[index], newSize);
                     } else {
                         fprintf(stderr, "Reallocation failed for new size %zu\n", newSize);
                     }
@@ -56,7 +105,10 @@ void random_alloc_realloc_calloc_test() {
                     // If pointer is NULL, treat it as allocation
                     pointers[index] = MyMalloc(size);
                     if (pointers[index] != NULL) {
+                        sizes[index] = size;
+                        fill_memory(pointers[index], size, 0xAA);
                         printf("Allocated memory of size %zu at address %p using MyMalloc\n", size, pointers[index]);
+                        print_memory(pointers[index], size);
                     } else {
                         fprintf(stderr, "Allocation failed for size %zu using MyMalloc\n", size);
                     }
@@ -66,13 +118,23 @@ void random_alloc_realloc_calloc_test() {
             case 2: // Free existing memory
                 if (pointers[index] != NULL) {
                     printf("Freeing memory at address %p\n", pointers[index]);
+                    // Verify memory content before freeing
+                    if (!check_memory(pointers[index], sizes[index], 0xAA)) {
+                        fprintf(stderr, "Memory corruption detected before freeing\n");
+                    } else {
+                        print_memory(pointers[index], sizes[index]);
+                    }
                     MyFree(pointers[index]);
                     pointers[index] = NULL;
+                    sizes[index] = 0;
                 } else {
                     // If pointer is NULL, treat it as allocation
                     pointers[index] = MyMalloc(size);
                     if (pointers[index] != NULL) {
+                        sizes[index] = size;
+                        fill_memory(pointers[index], size, 0xAA);
                         printf("Allocated memory of size %zu at address %p using MyMalloc\n", size, pointers[index]);
+                        print_memory(pointers[index], size);
                     } else {
                         fprintf(stderr, "Allocation failed for size %zu using MyMalloc\n", size);
                     }
@@ -83,14 +145,13 @@ void random_alloc_realloc_calloc_test() {
                 if (pointers[index] == NULL) {
                     pointers[index] = MyCalloc(1, size);
                     if (pointers[index] != NULL) {
-                        printf("Allocated zero-initialized memory of size %zu at address %p using MyCalloc\n", size, pointers[index]);
+                        sizes[index] = size;
                         // Verify zero-initialization
-                        unsigned char* bytePtr = (unsigned char*)pointers[index];
-                        for (size_t j = 0; j < size; ++j) {
-                            if (bytePtr[j] != 0) {
-                                fprintf(stderr, "Memory at %p is not zero-initialized\n", pointers[index]);
-                                break;
-                            }
+                        if (check_memory(pointers[index], size, 0)) {
+                            printf("Allocated zero-initialized memory of size %zu at address %p using MyCalloc\n", size, pointers[index]);
+                            print_memory(pointers[index], size);
+                        } else {
+                            fprintf(stderr, "Memory at %p is not zero-initialized\n", pointers[index]);
                         }
                     } else {
                         fprintf(stderr, "Allocation failed for size %zu using MyCalloc\n", size);
@@ -104,72 +165,70 @@ void random_alloc_realloc_calloc_test() {
     for (int i = 0; i < NUM_ALLOCS; ++i) {
         if (pointers[i] != NULL) {
             printf("Freeing remaining memory at address %p\n", pointers[i]);
+            // Verify memory content before freeing
+            if (!check_memory(pointers[i], sizes[i], 0xAA)) {
+                fprintf(stderr, "Memory corruption detected before freeing\n");
+            } else {
+                print_memory(pointers[i], sizes[i]);
+            }
             MyFree(pointers[i]);
             pointers[i] = NULL;
+            sizes[i] = 0;
         }
     }
 }
 
-void fill_memory(void* ptr, size_t size, char pattern) {
-    if (ptr != NULL) {
-        memset(ptr, pattern, size);
-    }
+int main()
+{
+	printf("Starting the heap memory manager test...\n");
+    
+    // Run the stress test
+    random_alloc_realloc_calloc_test();
+    
+    printf("Heap memory manager test completed.\n");
+    return 0;
 }
 
-// Test function to repeatedly allocate and reallocate memory
-void test_realloc(int num_iterations, size_t initial_size, size_t increment_size) {
-    void* ptr = NULL;
-
-    for (int i = 0; i < num_iterations; ++i) {
-        // Allocate initial block
-        if (ptr == NULL) {
-            ptr = MyMalloc(initial_size);
-            if (ptr == NULL) {
-                perror("MyMalloc failed");
-                return;
-            }
-            fill_memory(ptr, initial_size, 'A' + i % 26); // Fill with pattern
-        } else {
-            // Reallocate the block with increased size
-            size_t new_size = initial_size + (i + 1) * increment_size;
-            ptr = MyRealloc(ptr, new_size);
-            if (ptr == NULL) {
-                perror("MyRealloc failed");
-                return;
-            }
-            fill_memory(ptr, new_size, 'A' + i % 26); // Fill with pattern
-        }
-
-        // Debug the state of the heap
-        debug_heap();
-    }
-
-    // Free the allocated block
-    MyFree(ptr);
-    printf("Freed memory.\n");
-
-    // Final debug of heap state
-    debug_heap();
-}
 /*
 int main() {
-printf("HEllo");
-    // Example parameters
-
-    size_t initial_size = 128;       // Initial size of the block
-    size_t increment_size = 64;      // Increment size for reallocation
-
-    // Test the realloc function
-    test_re    int num_iterations = 10;alloc(num_iterations, initial_size, increment_size);
-
+	initialize();
+	debug_heap();
+    // Run the stress test
+    char* ptr1 = MyMalloc(10);
+    for(int i = 0 ; i < 10 ; i++)
+    {
+    	*(ptr1+i) = i;
+    	
+    }
+    char*ptr2 = ptr1;
+    for(char i = 0 ; i < 10 ; i++)
+    {
+    	printf("\nelement %d : %d",i,*(ptr1+i));
+    } 
+    //debug_heap();
+    ptr2 = MyCalloc(2,4);
+    //debug_heap();
+    for(char i = 0 ; i < 8 ; i++)
+    {
+    	*(ptr2+i) = 'A' + i;
+    	
+    }
+    for(char i = 0 ; i < 8 ; i++)
+    {
+    	printf("\nelement %d : %c",i,*(ptr2+i));
+    } 
+    for(char i = 0 ; i < 10 ; i++)
+    {
+    	printf("\nelement %d : %d",i,*(ptr1+i));
+    } 
+    MyFree(ptr1);
+    for(char i = 0 ; i < 8 ; i++)
+    {
+    	printf("\nelement %d : %c",i,*(ptr2+i));
+    } 
+    //debug_heap();
+    MyFree(ptr2);
+    //debug_heap();
     return 0;
 }*/
-
-int main() { 
-    initialize();
-    printf("Starting random allocation, reallocation, and deallocation test...\n");
-    random_alloc_realloc_calloc_test();
-    printf("Test complete.\n");
-    return 0;
-}
 

@@ -2,8 +2,14 @@
 #define HMM_H
 #include <string.h>
 
-#define HEAP_SIZE			1024*1024*20
+#define HEAP_SIZE			1024*1024*2
+#define PROG_BRK_INC			1024*4
 #define PROGRAM_BREAK_INCREMENT		500 
+
+// Ensure alignment of the block
+#define ALIGNMENT 8
+#define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1))
+
 struct block{
     size_t size;			//size of block it refers to  
     int free;   			//check whether block is free or allocated                        
