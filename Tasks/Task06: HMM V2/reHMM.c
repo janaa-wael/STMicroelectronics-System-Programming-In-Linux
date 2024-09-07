@@ -19,12 +19,12 @@ void split(struct block *fitting_slot, size_t size) {
     }
 
     // Calculate the address of the new block
-    struct block *new_block = (struct block *)((char *)fitting_slot + sizeof(struct block) + size);
+    struct block *new_block = (void*)((void*)fitting_slot + sizeof(struct block) + size);
 
     // Ensure the new block address is within the allocated memory
-    if ((char *)new_block >= (char *)fitting_slot + fitting_slot->size) {
+    /*if ((char *)new_block >= (char *)fitting_slot + fitting_slot->size) {
         return; // Invalid split, would result in out-of-bounds memory access
-    }
+    }*/
 
     // Set up the new block's metadata
     new_block->size = fitting_slot->size - size - sizeof(struct block);
@@ -37,93 +37,216 @@ void split(struct block *fitting_slot, size_t size) {
     fitting_slot->next = new_block;
 }
 
-
-
-void* MyMalloc(size_t num_of_bytes) {
+/*
+void* MyMalloc(size_t num_of_bytes) 
+{
     struct block* curr = List_Of_Free_Blocks;
     struct block* prev = NULL;
     void* result = NULL;
-	if(num_of_bytes%8 != 0)
-		num_of_bytes = ALIGN(num_of_bytes);
+    
+    num_of_bytes = ALIGN(num_of_bytes);
+    
+    // Ensure non-zero size for allocation
+    if(num_of_bytes == 0)
+    	num_of_bytes = sizeof(struct block);
+    	
     // Initialize heap if not already initialized
     if (List_Of_Free_Blocks == NULL) 
-    { //>>>>>>>>>>>>>>>>>>>>>
-        void* heap_start = sbrk(PROG_BRK_INC);
-        if (heap_start == (void *)-1) {
+    {
+        size_t count = (PROG_BRK_INC > (num_of_bytes + sizeof(struct block))) ? PROG_BRK_INC : num_of_bytes + sizeof(struct block);
+        void* heap_start = sbrk(count);
+        if (heap_start == (void *)-1) 
+        {
             perror("sbrk failed");
             return NULL;
         }
 
-        // Initialize the first block
         List_Of_Free_Blocks = (struct block*)heap_start;
-        List_Of_Free_Blocks->size = PROG_BRK_INC - sizeof(struct block);
+        List_Of_Free_Blocks->size = count - sizeof(struct block);
         List_Of_Free_Blocks->free = 1;
         List_Of_Free_Blocks->next = NULL;
     }
 
     curr = List_Of_Free_Blocks;
 
-    // Traverse the free list to find a suitable block
-    while (curr != NULL) 
-    {    	
-        // Check if the current block is large enough and free
-        if ((curr->size >= num_of_bytes) && curr->free) {
-            break;  // Suitable block found
-        }
-
+    while (curr != NULL && curr->next != NULL && (!curr->free || curr->size < num_of_bytes)) 
+    {
         prev = curr;
         curr = curr->next;
     }
 
-    // If no suitable block was found, request more memory
-    if (curr == NULL) 
+    if (curr->next == NULL && curr->size < num_of_bytes && curr->free) 
     {
-        void* heap_start = sbrk(sizeof(struct block) + num_of_bytes + PROG_BRK_INC);
-        if (heap_start == (void *)-1) {
+        //size_t count = (PROG_BRK_INC > (num_of_bytes ) ? PROG_BRK_INC : num_of_bytes;
+        size_t count = 0;
+    	while(count < num_of_bytes)
+    	{
+    		count += PROG_BRK_INC;
+    		void * sbrk_ret = sbrk(PROG_BRK_INC);
+    		if (sbrk_ret == (void *)-1) 
+     		{
+           	 	perror("sbrk failed");
+           		return NULL;
+        	}
+
+    	}
+        curr->size = count;
+        curr->free = 0;
+        curr->next = NULL;
+
+        if (prev != NULL) 
+        {
+            prev->next = curr;
+        }
+        else 
+        {
+            List_Of_Free_Blocks = curr;
+        }
+    }
+
+    if (curr->size == num_of_bytes && curr->free) 
+    {
+        curr->free = 0;
+        result = (void*)(curr + 1);
+        return result;
+    } 
+    else if (curr->size >= (num_of_bytes + sizeof(struct block)) && curr->free) 
+    {
+        split(curr, num_of_bytes);
+        curr->free = 0;
+        result = (void*)(curr + 1);
+        return result;
+    } 
+    else if(curr->size < (num_of_bytes + sizeof(struct block)) && curr->free)
+    {
+    	size_t count = PROG_BRK_INC;
+    	while(count < num_of_bytes)
+    	{
+    		count += PROG_BRK_INC;
+    		void * sbrk_ret = sbrk(PROG_BRK_INC);
+    		if (sbrk_ret == (void *)-1) 
+     		{
+           	 	perror("sbrk failed");
+           		return NULL;
+        	}
+
+    	}
+    	curr->size = count;
+    	curr->free = 0;
+    	curr->next = 0;
+    	result = (void*)(curr + 1);
+        return result;
+    	
+    }
+    return NULL;  // In case no suitable block is found
+}*/
+
+void* MyMalloc(size_t num_of_bytes) 
+{
+    struct block* curr = List_Of_Free_Blocks;
+    struct block* prev = NULL;
+    void* result = NULL;
+    
+    num_of_bytes = ALIGN(num_of_bytes);
+    
+    // Ensure non-zero size for allocation
+    if(num_of_bytes == 0)
+    	num_of_bytes = sizeof(struct block);
+    	
+    // Initialize heap if not already initialized
+    if (List_Of_Free_Blocks == NULL) 
+    {
+        
+        void* heap_start = sbrk(PROG_BRK_INC);
+        if (heap_start == (void *)-1) 
+        {
             perror("sbrk failed");
             return NULL;
         }
 
-        // Initialize the new block
-        curr = (struct block*)heap_start;
-        curr->size = num_of_bytes;
-        curr->free = 0;
-        
-	struct block * next = (struct block*)((char*)curr + sizeof(struct block) + curr->size);
-	
-	curr->next = next;
-	
-	next->free = 1;
-	next->size = PROG_BRK_INC - sizeof(struct block);
-	next->next = NULL;
-        // Add the new block to the free list
-        if (prev != NULL) {
-            prev->next = curr;
-        } else {
-            List_Of_Free_Blocks = curr;
-        }
-        return (void*)(curr+1);
+        List_Of_Free_Blocks = (struct block*)heap_start;
+        List_Of_Free_Blocks->size = PROG_BRK_INC - sizeof(struct block);
+        List_Of_Free_Blocks->free = 1;
+        List_Of_Free_Blocks->next = NULL;
+    }
+    
+    curr = List_Of_Free_Blocks;
+    
+    while ( (curr != NULL) && (curr->size < num_of_bytes || curr->free != 1) ) 
+    {
+        prev = curr;
+        curr = curr->next;
+    }
+    
+    if(curr == NULL)
+    {
+    	if(prev->free == 1)
+	{
+	    	curr = prev;
+    	
+    		size_t count = PROG_BRK_INC;
+    		
+    		while(curr->size < num_of_bytes)
+    		{
+    			void* ret_ptr = sbrk(PROG_BRK_INC);
+    			curr->size += PROG_BRK_INC;
+    			if (ret_ptr == (void *)-1) 
+     			{
+        	   	 	perror("sbrk failed");
+        	   		return NULL;
+        		}
+    		}
+    	}
+    	else if(prev->free == 0)
+    	{
+    		curr = (struct block*)((char*)(prev + 1) + prev->size);
+    		void* ret_ptr = sbrk(PROG_BRK_INC);
+    		if (ret_ptr == (void *)-1) 
+     		{
+        	   	 	perror("sbrk failed");
+        	   		return NULL;
+        	}
+    		curr->size = PROG_BRK_INC - sizeof(struct block);
+    		while(curr->size < (num_of_bytes))
+    		{
+    			ret_ptr = sbrk(PROG_BRK_INC);
+    			curr->size += PROG_BRK_INC;
+    			if (ret_ptr == (void *)-1) 
+     			{
+        	   	 	perror("sbrk failed");
+        	   		return NULL;
+        		}
+    		}
+    		
+    	}
+    	prev->next = curr;
+    	curr->free = 0;
+    	curr->next = NULL;
+    	return (void*)(curr+1);
     }
 
-    // If the block is a perfect fit
     if (curr->size == num_of_bytes && curr->free) 
     {
         curr->free = 0;
-        result = (void*)(curr + 1);  // Return memory after the block header
+        result = (void*)(curr + 1);
+        return result;
     } 
-    // If the block is larger, split it
-    else if (curr->size > num_of_bytes + 2*sizeof(struct block)) {
+    else if ((curr->size >= (num_of_bytes + 2*sizeof(struct block))) && curr->free) 
+    {
         split(curr, num_of_bytes);
         curr->free = 0;
-        result = (void*)(curr + 1);  // Return memory after the block header
-    } 
-    // If the block is too small, return NULL (shouldn't happen due to previous checks)
-    else {
-        result = NULL;
+        result = (void*)(curr + 1);
+        return result;
     }
+    else if( (curr->size >= num_of_bytes) && curr->free )
+    {
+    	curr->free = 0;
+    	result = (void*)(curr + 1);
+    	return result;
+    }
+    return NULL;
+}  
 
-    return result;
-}
 
 
 void merge() {
@@ -137,51 +260,67 @@ void merge() {
         return;
     }
 
-    while (curr != NULL) {
+    while (curr->next != NULL) 
+    {
         // Check if both blocks are free and adjacent
         if (curr->free && curr->next != NULL && curr->next->free) {
-            // Ensure we don't have size overflow
-            if (curr->size > SIZE_MAX - (curr->next->size + sizeof(struct block))) {
-                prev = curr;
-                curr = curr->next; // Move to next block
-                continue;
-            }
-
             // Merge the blocks
             curr->size += curr->next->size + sizeof(struct block);
             curr->next = curr->next->next;
-        } else {
-            // Move to the next block
-            prev = curr;
-            curr = curr->next;
+        } 
+        // Move to the next block
+        prev = curr;
+        curr = curr->next;
+        if(curr == NULL)
+        {
+        	prev->next = NULL;
+        	break;
         }
+    }
+    if(curr != NULL)
+    {
+    	if(curr->free && prev->free && curr->next == NULL)
+    	{
+    		prev->size += curr->size + sizeof(struct block);
+    		prev->next = NULL;
+    	}
+    }
+    
+    while( (prev->size >=  PROG_BRK_DEC) && (prev->free == 1) && (prev->next == NULL) )
+    {
+		void* ret_ptr = sbrk (-PROG_BRK_DEC);
+		if (ret_ptr == (void *)-1) 
+     		{
+        	   	 	perror("sbrk failed");
+        	 
+        	}
+		prev->size-= PROG_BRK_DEC;
     }
 }
 
 
 void MyFree(void *ptr) {
 	
-	
-	if(ptr == NULL)
+	struct block* curr = List_Of_Free_Blocks;
+	if(ptr == NULL || curr == NULL)
 	{
 		return;
 	}
-	struct block* metadata_block = (struct block*)ptr - 1;
-	
-	if(metadata_block->free == 1)
+	if(curr->free == 1)
 	{
 		return;
 	}
-	metadata_block->free = 1;
 	
-    	/* Verifies if the pointer provided is within the range of the memory pool. */
-	if(((void*)List_Of_Free_Blocks <= ptr) && (ptr <= (void*)sbrk(0))) 
+	while((curr->next) != NULL)
 	{
-        	struct block* curr = ptr;
-        	--curr;
-        	curr->free = 1;
-        	merge();
-    	} 
+			if( (curr == (struct block*)ptr - 1) && curr->free == 0)
+			{
+				curr->free = 1;
+				merge();
+				break;			
+			}
+			curr = curr->next;
+	}
 }
 
 
@@ -212,32 +351,29 @@ void debug_heap() {
 
 void* MyCalloc(size_t nmemb, size_t size)
 {
-	size = ALIGN(size);
-\
-	if(nmemb == 0 || size == 0)
+	//size = ALIGN(size);
+	if(nmemb == 0 || size == 0 || nmemb*size <= 0)
 		return malloc(sizeof(struct block));
-	else if(nmemb != 0 && size > SIZE_MAX / nmemb)
+	else
 	{
 		void* ptr = malloc(nmemb*size);
-		struct block* metadata_block = (struct block*)((char*)ptr - sizeof(struct block));
 		if(ptr != NULL)
 		{
 			memset(ptr, 0, nmemb*size);
-			return ptr;
+			
 		}
-		else 
-			return NULL;
+		return ptr;
 	}
 }
 
 void* MyRealloc(void* ptr, size_t size)
 {
 	size = ALIGN(size);
-	if((ptr == NULL || ptr< (void*)List_Of_Free_Blocks || ptr > (void*)sbrk(0)) && size!=0)
+	if((ptr == NULL) && size!=0)
 	{
 		return malloc(size);
 	}
-	else if((ptr == NULL || ptr< (void*)List_Of_Free_Blocks || ptr > (void*)sbrk(0))  && size ==0)
+	else if((ptr == NULL)  && size ==0)
 	{
 		size = sizeof(struct block);
 		return malloc(size);
@@ -247,31 +383,28 @@ void* MyRealloc(void* ptr, size_t size)
 		MyFree(ptr);
 		return NULL;
 	}
-	else if (size == ((struct block*)ptr - 1)->size) {
+	else if (size <= (((struct block*)ptr) - 1)->size) {
         	return ptr; // No need to reallocate
     	}
 	else
 	{
-		if(ptr <= (void*)sbrk(0) && (ptr >= (void*)List_Of_Free_Blocks))
-		{			
-			struct block* metadata_block = (struct block*)((char*)ptr - sizeof(struct block));
-			 if (metadata_block == NULL || metadata_block->size == 0 ) 
-			 {
-        	    		fprintf(stderr, "Invalid metadata block or size.\n");
-        	    		return NULL;
-        		}
-			void* ptr2 = malloc(size);
-			if(ptr2 != NULL)
-			{
-				memcpy(ptr2,ptr, metadata_block->size < size ? metadata_block->size : size);
-				MyFree(ptr);
-				return ptr2;
-			}
-			else
-			{
-				return NULL;
-			}
-		}		
+		struct block* metadata_block = ((struct block*)ptr) - 1;
+		 if (metadata_block == NULL || metadata_block->size == 0 ) 
+		 {
+	    		fprintf(stderr, "Invalid metadata block or size.\n");
+	    		return NULL;
+		}
+		void* ptr2 = malloc(size);
+		if(ptr2 != NULL)
+		{
+			memcpy(ptr2,ptr, metadata_block->size);
+			MyFree(ptr);
+			return ptr2;
+		}
+		else
+		{
+			return NULL;
+		}
 	}
 	return ptr;
 }
@@ -280,7 +413,7 @@ void* malloc(size_t size)
 {
 	if(size ==0)
 		size = sizeof(struct block);
-		void* ptr = MyMalloc(size);
+	void* ptr = MyMalloc(size);
 	return ptr;	
 }
 
@@ -288,6 +421,7 @@ void free(void* ptr)
 {
 	MyFree(ptr);	
 }
+
 void* calloc(size_t nmemb, size_t size)
 {
 	return MyCalloc(nmemb,size);

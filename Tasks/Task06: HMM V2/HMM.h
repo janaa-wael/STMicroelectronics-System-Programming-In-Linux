@@ -2,13 +2,12 @@
 #define HMM_H
 #include <string.h>
 
-#define HEAP_SIZE			1024*1024*2
-#define PROG_BRK_INC			1024*4
-#define PROGRAM_BREAK_INCREMENT		500 
 
+#define PROG_BRK_INC			1000*1000*136
+#define PROG_BRK_DEC			8000
 // Ensure alignment of the block
-#define ALIGNMENT 8
-#define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1))
+#define ALIGNMENT 			8
+#define ALIGN(size) 			(((size+7)/8)*8)
 
 struct block{
     size_t size;			//size of block it refers to  
@@ -16,21 +15,15 @@ struct block{
     struct block *next; 	//Points to the next metadata block
 };
 
-
-void initialize();
 void split(struct block *fitting_slot,size_t size);
 void* MyMalloc(size_t num_of_bytes);
 void merge();
 void MyFree(void* ptr);
-int isBlockAllocated(void* ptr);
-int ProgBrkOffset();
-void* malloc(size_t size);
-void free(void* ptr);
 void* MyCalloc(size_t nmemb, size_t size);
 void* MyRealloc(void* ptr, size_t size);
-void* increase_block_size(void* ptr, size_t requested_size);
-void copy_block_contents(void* ptr1, void* ptr2);
 void debug_heap();
-void* dec_block_size(void* ptr, size_t size);
-void* Realloc2(void * ptr, size_t size);
+void* malloc(size_t size);
+void* calloc(size_t nmemb, size_t size);
+void free(void* ptr);
+void* realloc(void * ptr, size_t size);
 #endif
