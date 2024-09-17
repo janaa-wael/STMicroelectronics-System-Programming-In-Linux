@@ -222,6 +222,22 @@ void print_entry(const char *dir, const char *filename, int options, int show_in
 }
 
 void list_directory(const char *dir, int options) {
+
+    if (options & 128) { // -d option: Treat directory as a file
+        if (options & 1) { // -l option
+            print_long_format(dir, options & 32); // Show inode if -i is set
+        } else {
+            // Print directory name
+            if (options & 256) { // -1 option
+                printf("%s\n", dir);
+            } else {
+                printf("%s  ", dir);
+            }
+        }
+        printf("\n");
+        return;
+    }
+    
     DIR *d;
     struct dirent **entries;
     int count;
