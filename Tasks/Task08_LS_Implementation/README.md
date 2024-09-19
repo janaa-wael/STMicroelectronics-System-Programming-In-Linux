@@ -30,5 +30,5 @@ The following options are supported:
 Compile the code using:
 
 ```bash
-gcc -o my_ls my_ls.c
+gcc -o my_ls LS.c main.c
 
