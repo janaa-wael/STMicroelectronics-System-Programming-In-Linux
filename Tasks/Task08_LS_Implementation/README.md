@@ -1,6 +1,6 @@
 # Custom `ls` Implementation
 
-This repository contains a custom implementation of the `ls` command in C. The implementation supports various options similar to the standard `ls` command found in Unix-like operating systems.
+This task contains a custom implementation of the `ls` command in C. The implementation supports various options similar to the standard `ls` command found in Unix-like operating systems.
 
 ## Features
 
