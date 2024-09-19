@@ -27,8 +27,10 @@ The following options are supported:
 
 ## Usage
 
-Compile the code using:
+### Compilation
+
+To compile the code, use the provided `Makefile`. Run the following command in the terminal:
 
 ```bash
-gcc -o my_ls LS.c main.c
+make
 
